@@ -1,0 +1,15 @@
+Flask + JWT + CSRF + Streamlit sab kuch combine kiya hai, aur iss wajah se kuch conflicts ho sakte hain. Primary errors:
+
+CSRF Issue: Streamlit ke JSON requests Flask ke CSRF validation se takra rahe hain.
+Content-Type Issue: Streamlit se JSON ja raha hai, lekin Flask request.form expect kar raha hai.
+Session Management Issue: Streamlit ka session Flask ke session se different hota hai.
+Incorrect FormData Handling in Signup.js (fullname instead of full_name).
+Streamlit ke Routes Flask ke JWT/session se handle nahi ho rahe.
+
+
+--------how we fixed----------
+ 1] Flask Backend Fix (Remove CSRF for API calls)
+CSRF session-based login ke liye zaroori hai, lekin API ke JWT login/signup me zaroori nahi. Toh:
+
+JWT routes pe CSRF hatao
+Session-based routes pe CSRF rakho

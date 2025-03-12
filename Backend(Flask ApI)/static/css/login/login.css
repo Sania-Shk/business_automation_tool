@@ -1,0 +1,88 @@
+/* General Styles */
+body {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    background: linear-gradient(135deg, #3B3030, #664343);
+    font-family: 'Poppins', sans-serif;
+    color: #FFF0D1;
+}
+
+.wrapper {
+    width: 350px;
+    background: rgba(121, 87, 87, 0.2);
+    padding: 2rem;
+    border-radius: 10px;
+    box-shadow: 0px 10px 30px rgba(0, 0, 0, 0.3);
+    text-align: center;
+    backdrop-filter: blur(10px);
+}
+
+h2 {
+    margin-bottom: 20px;
+    color: #FFF0D1;
+    font-size: 1.8rem;
+}
+
+.input-box {
+    position: relative;
+    width: 100%;
+    margin-bottom: 20px;
+}
+
+.input-box input {
+    width: 80%;
+    padding: 12px;
+    padding-left: 40px;
+    border-radius: 8px;
+    border: none;
+    background: rgba(255, 240, 209, 0.3);
+    color: #3B3030;
+    outline: none;
+    font-size: 1rem;
+    transition: 0.3s;
+}
+
+.input-box input::placeholder {
+    color: rgba(255, 240, 209, 0.7);
+}
+
+.input-box input:focus {
+    background: rgba(255, 240, 209, 0.5);
+}
+
+/* Button Styles - Used for Login & Signup Buttons */
+.btn {
+    width: 70%; /* Adjusted size to 80% */
+    padding: 10px;
+    border: none;
+    border-radius: 8px;
+    color: #FFF0D1;
+    background: #795757;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: 0.3s;
+}
+
+.btn:hover {
+    background: #FFBA86;
+    transform: scale(1.05);
+}
+
+/* Toggle Link - Used for switching between Login & Signup Pages */
+.toggle-link {
+    margin-top: 15px;
+}
+
+.toggle-link a {
+    color: #FFF0D1;
+    text-decoration: none;
+    font-weight: bold;
+    transition: 0.3s;
+}
+
+.toggle-link a:hover {
+    color: #795757;
+    text-decoration: underline;
+}

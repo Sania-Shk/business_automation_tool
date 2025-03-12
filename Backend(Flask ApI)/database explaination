@@ -1,0 +1,7 @@
+1] ----Flask-Login ke UserMixin ko inherit kiya -----
+
+️⃣1 is_active() → Hamesha True return karega, taaki Flask-Login ko lage ki user active hai.
+2 get_id() → User ka ID return karega taaki Flask-Login user ko recognize kar sake.
+
+💡 Why?
+UserMixin Flask-Login ke required attributes (is_active, get_id, etc.)

@@ -1,0 +1,10 @@
+flask
+flask-bcrypt
+flask-cors
+flask-sqlalchemy
+flask-migrate
+flask-login
+flask-jwt-extended
+psycopg2
+pandas
+plotly
