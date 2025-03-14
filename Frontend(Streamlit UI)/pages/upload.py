@@ -1,8 +1,9 @@
-import streamlit as st
 import pandas as pd
 import requests
+import streamlit as st
 
 BASE_URL = "http://127.0.0.1:5000"
+
 
 def show_upload_page():
     st.title("📤 Upload Your File")
@@ -49,6 +50,7 @@ def show_upload_page():
 
         except Exception as e:
             st.error(f"❌ Error reading file: {str(e)}")
+
 
 # ✅ Call function when script runs
 if __name__ == "__main__":

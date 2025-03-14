@@ -1,9 +1,10 @@
-from flask_sqlalchemy import SQLAlchemy
 from flask_bcrypt import Bcrypt  # (Password hashing, so It won't store raw data)
 from flask_login import UserMixin
+from flask_sqlalchemy import SQLAlchemy
 
 db = SQLAlchemy()
 bcrypt = Bcrypt()
+
 
 #  User Table
 class UserDetail(db.Model, UserMixin):
@@ -20,6 +21,7 @@ class UserDetail(db.Model, UserMixin):
     def get_id(self):
         return str(self.id)  # return user-ID, that flask uses to recognize
 
+
 #  Uploaded Files Table
 class UploadedFile(db.Model):
     __tablename__ = "uploaded_file"
@@ -27,6 +29,7 @@ class UploadedFile(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('user_detail.id'), nullable=False)  # ✅ Changed user_email → user_id
     filename = db.Column(db.String(255), nullable=False)
     upload_time = db.Column(db.TIMESTAMP, server_default=db.func.current_timestamp())
+
 
 #  Function to initialize database
 def init_db(app):

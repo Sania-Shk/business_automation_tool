@@ -1,7 +1,8 @@
-import streamlit as st
 import requests
+import streamlit as st
 
 BACKEND_URL = "http://127.0.0.1:5000"  # Flask API URL
+
 
 def show_signup_page():
     st.title("📝 Signup")
@@ -25,5 +26,3 @@ def show_signup_page():
             st.success("Signup Successful! Now login.")
         else:
             st.error(response.json().get("error", "Signup failed!"))
-
-

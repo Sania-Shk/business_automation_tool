@@ -1,8 +1,10 @@
 # this page help ,  jo password hashing, verification, aur JWT token handling karega.
 
-import jwt
 import datetime
+
+import jwt
 from flask import current_app
+
 
 def generate_token(user_id):
     payload = {
@@ -11,6 +13,7 @@ def generate_token(user_id):
     }
     token = jwt.encode(payload, current_app.config["SECRET_KEY"], algorithm="HS256")
     return token
+
 
 def decode_token(token):
     try:

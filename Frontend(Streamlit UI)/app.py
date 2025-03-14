@@ -1,4 +1,5 @@
 import streamlit as st
+
 from pages import login, signup, upload, history, processed_data, visualization
 
 st.set_page_config(page_title="Business Data Automation", page_icon="📊")
