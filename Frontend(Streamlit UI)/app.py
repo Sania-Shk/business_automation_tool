@@ -2,7 +2,8 @@ import streamlit as st
 
 from pages import login, signup, upload, history, processed_data, visualization
 
-st.set_page_config(page_title="Business Data Automation", page_icon="📊")
+# Set page configuration
+st.set_page_config(page_title="Business Data Entry Automation", layout="wide")
 
 # Sidebar Navigation
 st.sidebar.title("Navigation")
@@ -26,3 +27,7 @@ elif page == "Processed Data":
 
 elif page == "Visualization":
     visualization.show_visualization_page()
+
+# Footer
+st.sidebar.markdown("---")
+st.sidebar.markdown("Developed by San & Team 🚀")
