@@ -1,49 +1,61 @@
-# import sys
-# import streamlit as st
-# import os
-# import pandas as pd
-#
-# # Backend directory ka path dynamically resolve karo
-# backend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "Backend (Flask API)"))
-# sys.path.insert(0, backend_dir)
-#
-# print("Backend Path Added:", backend_dir)  # Debugging ke liye
-#
-# #   Import
-# try:
-#     from utils.processing import process_data
-# except ModuleNotFoundError as e:
-#     print("Error Importing processing.py:", e)
-#
-#
-# # Streamlit UI
-# st.title("Upload & Process Data")
-#
-# uploaded_file = st.file_uploader("Upload your dataset (.csv or .xlsx)", type=["csv", "xlsx"])
-#
-# if uploaded_file is not None:
-#     file_path = os.path.join("uploads", uploaded_file.name)
-#     with open(file_path, "wb") as f:
-#         f.write(uploaded_file.getbuffer())
-#
-#     st.success(f"File saved at: {file_path}")
-#
-#     # 🛠 Processing Call
-#     df, changes, processed_file_path = process_data(file_path)
-#
-#     if df is not None:
-#         st.success("Processing Completed!")
-#
-#         # Show Changes
-#         st.write("### Changes Made:")
-#         st.json(changes)
-#
-#         # Show Processed Data
-#         st.write("### Processed Data Preview:")
-#         st.dataframe(df.head())
-#
-#         # Download Processed File
-#         with open(processed_file_path, "rb") as file:
-#             st.download_button("Download Processed File", file, file_name="processed_data.csv", mime="text/csv")
-#     else:
-#         st.error("Error in processing! Please check the file format.")
+import streamlit as st
+import requests
+
+API_URL = "http://127.0.0.1:5000"  # Change this if using a deployed backend
+
+
+def show_processed_data_page():
+    """Streamlit page to view & download processed files."""
+    st.title("📂 Processed Data")
+
+    # ✅ Ensure user is logged in
+    auth_token = st.session_state.get("auth_token")
+    if not auth_token:
+        st.warning("⚠️ Please log in first!")
+        return
+
+    headers = {"Authorization": f"Bearer {auth_token}"}
+
+    # ✅ Fetch Processed Files from API
+    st.write("📡 Fetching processed files from API...")
+
+    try:
+        response = requests.get(f"{API_URL}/processed_files", headers=headers)
+
+        if response.status_code == 200:
+            response_data = response.json()
+            files = response_data.get("processed_files", [])
+
+            if files:
+                selected_file = st.selectbox("📁 Select a processed file:", [file["filename"] for file in files])
+
+                # ✅ Get selected file's download URL
+                file_url = next(file["download_url"] for file in files if file["filename"] == selected_file)
+
+                # ✅ Display File Information
+                st.success(f"✅ File `{selected_file}` is available for download.")
+
+                # ✅ Download Button
+                st.markdown(f"[⬇️ Download Processed File]({file_url})", unsafe_allow_html=True)
+
+            else:
+                st.warning("⚠️ No processed files available.")
+
+        elif response.status_code == 401:
+            st.warning("⚠️ Session expired. Please log in again.")
+
+        else:
+            try:
+                error_message = response.json().get("error", "Unknown error")
+            except requests.exceptions.JSONDecodeError:
+                error_message = f"Unexpected response: {response.text}"  # Debugging info
+
+            st.error(f"❌ Failed to fetch processed files: {error_message}")
+
+    except requests.exceptions.RequestException as e:
+        st.error(f"❌ Network error: {str(e)}")
+
+
+# ✅ Run function
+if __name__ == "__main__":
+    show_processed_data_page()

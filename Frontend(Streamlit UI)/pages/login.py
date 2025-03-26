@@ -3,7 +3,6 @@ import streamlit as st
 
 BACKEND_URL = "http://127.0.0.1:5000"
 
-
 def show_login_page():
     st.title("🔐 Login")
 
@@ -20,14 +19,15 @@ def show_login_page():
         if response.status_code == 200:
             data = response.json()
 
-            # ✅ Store user details properly
+            # ✅ Store user session properly
             st.session_state["auth_token"] = data["token"]
-            st.session_state["user_id"] = data["user"].get("id")  # ✅ User ID stored from user_detail table
-            st.session_state["user_name"] = data["user"].get("firstname", "User")  # ✅ Firstname stored
-            st.session_state["login_message"] = "✅ Login successful!"
+            st.session_state["user_id"] = data["user"]["id"]
+            st.session_state["user_email"] = data["user"]["email"]  # ✅ Fix: store email too
+            st.session_state["user_name"] = data["user"].get("full_name", "User")
+            st.session_state["is_logged_in"] = True  # ✅ New session flag
 
-            st.rerun()  # ✅ Refresh page after login
+            st.success("✅ Login successful! Redirecting...")
+            st.rerun()  # ✅ Force page refresh to apply session
 
         else:
-            error_message = response.json().get("error", "❌ Invalid email or password!")
-            st.error(error_message)
+            st.error(response.json().get("error", "❌ Invalid email or password!"))

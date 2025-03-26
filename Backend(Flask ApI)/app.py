@@ -1,19 +1,18 @@
 import os
 from datetime import datetime
-
-from dotenv import load_dotenv  # Load environment variables
+from dotenv import load_dotenv
 from flask import Flask, request, jsonify
 from flask_bcrypt import Bcrypt
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf.csrf import CSRFProtect
+from werkzeug.utils import secure_filename
+from flask_migrate import Migrate
 
-# from utils.processing import process_data
+from database import db, UploadedFile, User_Detail, ProcessedFile
+from utils.processing import save_processed_file, process_data
 
-# sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-# from utils.processing import process_data
-
-#  Load .env file
+# Load environment variables
 load_dotenv()
 
 # Initialize Flask app
@@ -23,45 +22,18 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SECRET_KEY'] = os.getenv("SECRET_KEY", "your_secret_key")
 app.config['JWT_SECRET_KEY'] = os.getenv("JWT_SECRET_KEY", "your_jwt_secret_key")
 app.config['UPLOAD_FOLDER'] = 'uploads'
-os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)  # Ensure upload folder exists
+os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 # Initialize extensions
-db = SQLAlchemy(app)
+db.init_app(app)
 bcrypt = Bcrypt(app)
 jwt = JWTManager(app)
 csrf = CSRFProtect(app)
 csrf.init_app(app)
-csrf._disable_on_blueprints = True
+migrate = Migrate(app, db)
 
+# ------------------ USER AUTHENTICATION ------------------
 
-# Database Models
-class User_detail(db.Model):
-    __tablename__ = "user_detail"
-    id = db.Column(db.Integer, primary_key=True)
-    full_name = db.Column(db.String(100), nullable=False)
-    email = db.Column(db.String(100), unique=True, nullable=False)
-    password = db.Column(db.String(255), nullable=False)
-
-
-class UploadedFile(db.Model):
-    __tablename__ = "uploaded_file"
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user_detail.id'), nullable=False)
-    filename = db.Column(db.String(255), nullable=False)
-    upload_time = db.Column(db.TIMESTAMP, default=datetime.utcnow)
-
-
-class ProcessedData(db.Model):
-    __tablename__ = "processed_data"
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user_detail.id'), nullable=False)
-    filename = db.Column(db.String(255), nullable=False)
-    processed_json = db.Column(db.JSON, nullable=False)
-    changes = db.Column(db.JSON, nullable=False)
-    processed_time = db.Column(db.TIMESTAMP, default=datetime.utcnow)
-
-
-# Signup Route
 @app.route('/signup', methods=['POST'])
 @csrf.exempt
 def signup():
@@ -73,11 +45,11 @@ def signup():
     if not full_name or not email or not password:
         return jsonify({"error": "All fields are required"}), 400
 
-    if User_detail.query.filter_by(email=email).first():
+    if User_Detail.query.filter_by(email=email).first():
         return jsonify({"error": "Email already registered"}), 400
 
     hashed_password = bcrypt.generate_password_hash(password).decode('utf-8')
-    new_user = User_detail(full_name=full_name, email=email, password=hashed_password)
+    new_user = User_Detail(full_name=full_name, email=email, password=hashed_password)
 
     try:
         db.session.add(new_user)
@@ -85,18 +57,16 @@ def signup():
         return jsonify({"message": "User registered successfully!"}), 201
     except Exception as e:
         db.session.rollback()
-        return jsonify({"error": "Database error"}), 500
+        return jsonify({"error": f"Database error: {str(e)}"}), 500
 
 
-# Login Route
 @app.route('/login', methods=['POST'])
 @csrf.exempt
 def login():
     data = request.json
     email = data.get('email')
     password = data.get('password')
-
-    user = User_detail.query.filter_by(email=email).first()
+    user = User_Detail.query.filter_by(email=email).first()
 
     if not user or not bcrypt.check_password_hash(user.password, password):
         return jsonify({"error": "Invalid credentials"}), 401
@@ -109,111 +79,103 @@ def login():
         "user": {"id": user.id, "full_name": user.full_name, "email": user.email}
     }), 200
 
+# ------------------ FILE UPLOAD & HISTORY ------------------
 
-# Upload File Route
 @app.route('/upload', methods=['POST'])
 @csrf.exempt
 @jwt_required()
 def upload_file():
+    if 'file' not in request.files:
+        return jsonify({"error": "No file uploaded"}), 400
+
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({"error": "No selected file"}), 400
+
+    current_user = get_jwt_identity()
+    user = User_Detail.query.filter_by(email=current_user).first()
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    file_data = file.read()
+    if not file_data:
+        return jsonify({"error": "File upload failed, no data read."}), 500  # ✅ Debugging
+
+    # ✅ Store file in database with binary data
+    new_file = UploadedFile(user_id=user.id, filename=secure_filename(file.filename), file_data=file_data)
+
     try:
-        if 'file' not in request.files:
-            return jsonify({"error": "No file uploaded"}), 400
-
-        file = request.files['file']
-        if file.filename == '':
-            return jsonify({"error": "No selected file"}), 400
-
-        current_user = get_jwt_identity()
-        user = User_detail.query.filter_by(email=current_user).first()
-
-        if not user:
-            return jsonify({"error": "User not found"}), 404
-
-        #  Store File in DB
-        new_file = UploadedFile(user_id=user.id, filename=file.filename)
         db.session.add(new_file)
         db.session.commit()
-
         return jsonify({"message": "File uploaded successfully!", "filename": file.filename}), 201
-
     except Exception as e:
         db.session.rollback()
         return jsonify({"error": f"Database error: {str(e)}"}), 500
 
 
-# # Process Data Route
-# @app.route('/process-data', methods=['POST'])
-# @jwt_required()
-# def process_data_api():
-#     try:
-#         if 'file' not in request.files:
-#             return jsonify({"error": "No file uploaded"}), 400
-#
-#         file = request.files['file']
-#         file_path = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
-#         file.save(file_path)
-#
-#         processed_df, changes = process_data(file_path)
-#         if processed_df is None:
-#             return jsonify({"error": "Processing failed", "details": changes}), 500
-#
-#         processed_json = processed_df.to_dict(orient='records')
-#         current_user = get_jwt_identity()
-#         user = User_detail.query.filter_by(email=current_user).first()
-#
-#         if not user:
-#             return jsonify({"error": "User not found"}), 404
-#
-#         new_processed = ProcessedData(user_id=user.id, filename=file.filename, processed_json=processed_json,
-#                                       changes=changes)
-#         db.session.add(new_processed)
-#         db.session.commit()
-#
-#         return jsonify({"processed_data": processed_json, "changes": changes}), 200
-#     except Exception as e:
-#         db.session.rollback()
-#         return jsonify({"error": str(e)}), 500
-#
-#
-# # Get Processed Data Route
-# @app.route('/get-processed-data', methods=['GET'])
-# @jwt_required()
-# def get_processed_data():
-#     current_user = get_jwt_identity()
-#     user = User_detail.query.filter_by(email=current_user).first()
-#     if not user:
-#         return jsonify({"error": "User not found"}), 404
-#
-#     processed_data = ProcessedData.query.filter_by(user_id=user.id).order_by(
-#         ProcessedData.processed_time.desc()).first()
-#     if not processed_data:
-#         return jsonify({"error": "No processed data found"}), 404
-#
-#     return jsonify({"processed_data": processed_data.processed_json, "changes": processed_data.changes}), 200
 
-
-# Get User History Route
-@app.route('/history', methods=['GET'])
-@csrf.exempt
+@app.route("/history", methods=["GET"])
 @jwt_required()
-def get_upload_history():
-    current_user = get_jwt_identity()  # Get logged-in user email
-    user = User_detail.query.filter_by(email=current_user).first()
+@csrf.exempt
+def get_user_history():
+    current_user = get_jwt_identity()
+    user = User_Detail.query.filter_by(email=current_user).first()
 
     if not user:
         return jsonify({"error": "User not found"}), 404
 
     uploaded_files = UploadedFile.query.filter_by(user_id=user.id).all()
+    files_data = [{"filename": file.filename, "upload_time": file.upload_time.strftime("%Y-%m-%d %H:%M:%S")} for file in uploaded_files]
 
-    files_data = [
-        {"filename": file.filename, "upload_time": file.upload_time.strftime("%Y-%m-%d %H:%M:%S")}
-        for file in uploaded_files
-    ]
+    return jsonify({"uploaded_files": files_data}), 200
 
-    return jsonify({"files": files_data}), 200
+# ------------------ FILE PROCESSING ------------------
+
+@app.route("/process", methods=["POST"])
+@csrf.exempt
+def process_user_file():
+    data = request.json
+    filename = data.get("filename")
+    user_email = data.get("email")
+
+    if not filename or not user_email:
+        return jsonify({"error": "Filename and email are required"}), 400
+
+    file_entry = UploadedFile.query.filter_by(filename=filename).first()
+    if not file_entry or file_entry.file_data is None:
+        return jsonify({"error": "File not found or empty"}), 404
+
+    file_data = file_entry.file_data
+    file_type = filename.split('.')[-1]
+
+    processed_df, message = process_data(file_data, file_type)
+    if processed_df is None:
+        return jsonify({"error": message}), 500
+
+    success, file_url = save_processed_file(user_email, filename, processed_df, file_type)
+    if not success:
+        return jsonify({"error": file_url}), 500
+
+    return jsonify({"message": message, "download_url": file_url}), 200
 
 
-# Run Flask App
+@app.route("/processed_files", methods=["GET"])
+@jwt_required()
+@csrf.exempt
+def get_processed_files():
+    current_user = get_jwt_identity()
+    user = User_Detail.query.filter_by(email=current_user).first()
+
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    processed_files = ProcessedFile.query.filter_by(user_id=user.id).all()
+    files_data = [{"filename": file.filename, "processed_time": file.processed_time.strftime("%Y-%m-%d %H:%M:%S"), "download_url": file.file_url} for file in processed_files]
+
+    return jsonify({"processed_files": files_data}), 200
+
+# ------------------ RUN FLASK APP ------------------
+
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()

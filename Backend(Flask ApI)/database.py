@@ -1,38 +1,50 @@
-from flask_bcrypt import Bcrypt  # (Password hashing, so It won't store raw data)
-from flask_login import UserMixin
 from flask_sqlalchemy import SQLAlchemy
+from flask_bcrypt import Bcrypt
+from flask_login import UserMixin
 
 db = SQLAlchemy()
 bcrypt = Bcrypt()
 
+# ✅ User Table
+class User_Detail(db.Model, UserMixin):
+    __tablename__ = "user_detail"
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    full_name = db.Column(db.String(100), nullable=False)
+    email = db.Column(db.String(100), unique=True, nullable=False, index=True)
+    password = db.Column(db.String(255), nullable=False)
 
-#  User Table
-class UserDetail(db.Model, UserMixin):
-    __tablename__ = "user_detail"  # Explicit table name
-    id = db.Column(db.Integer, primary_key=True)
-    firstname = db.Column(db.String(100), nullable=False)  # ✅ FIXED: Changed full_name → firstname
-    email = db.Column(db.String(100), unique=True, nullable=False)
-    password = db.Column(db.String(255), nullable=False)  # Hashed password
-
-    # Flask-Login required methods
-    def is_active(self):
-        return True
-
-    def get_id(self):
-        return str(self.id)  # return user-ID, that flask uses to recognize
+    # ✅ Relationships
+    uploaded_files = db.relationship("UploadedFile", backref="user", cascade="all, delete-orphan")
+    processed_files = db.relationship("ProcessedFile", backref="user", cascade="all, delete-orphan")
 
 
-#  Uploaded Files Table
+# ✅ Uploaded Files Table
 class UploadedFile(db.Model):
     __tablename__ = "uploaded_file"
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user_detail.id'), nullable=False)  # ✅ Changed user_email → user_id
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user_detail.id", ondelete="CASCADE"), nullable=False)
+    filename = db.Column(db.String(255), nullable=False, index=True)
+    file_data = db.Column(db.LargeBinary, nullable=True)  # ✅ Nullable in case of URL storage
+    upload_time = db.Column(db.TIMESTAMP, server_default=db.func.current_timestamp(), nullable=False)
+
+    # ✅ Relationship with ProcessedFile
+    processed_files = db.relationship("ProcessedFile", backref="uploaded_file", cascade="all, delete-orphan")
+
+
+# ✅ Processed Files Table (Improved)
+class ProcessedFile(db.Model):
+    __tablename__ = "processed_file"
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user_detail.id", ondelete="CASCADE"), nullable=False)
+    uploaded_file_id = db.Column(db.Integer, db.ForeignKey("uploaded_file.id", ondelete="CASCADE"), nullable=False)
     filename = db.Column(db.String(255), nullable=False)
-    upload_time = db.Column(db.TIMESTAMP, server_default=db.func.current_timestamp())
+    file_url = db.Column(db.String(500), nullable=False)  # ✅ Store File URL Instead of Binary
+    processed_time = db.Column(db.TIMESTAMP, server_default=db.func.current_timestamp(), nullable=False)
 
 
-#  Function to initialize database
+# ✅ Function to Initialize Database
 def init_db(app):
+    """Initializes the database schema."""
     db.init_app(app)
     with app.app_context():
         db.create_all()
