@@ -1,6 +1,11 @@
 import requests
 import streamlit as st
 
+# ⬇ Load CSS
+def load_css():
+    with open("static/style.css") as f:
+        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+
 BACKEND_URL = "http://127.0.0.1:5000"  # Flask API URL
 
 

@@ -9,8 +9,7 @@ from flask_wtf.csrf import CSRFProtect
 from werkzeug.utils import secure_filename
 from flask_migrate import Migrate
 
-from database import db, UploadedFile, User_Detail, ProcessedFile
-from utils.processing import save_processed_file, process_data
+from database import db, UploadedFile, User_Detail
 
 # Load environment variables
 load_dotenv()
@@ -59,7 +58,6 @@ def signup():
         db.session.rollback()
         return jsonify({"error": f"Database error: {str(e)}"}), 500
 
-
 @app.route('/login', methods=['POST'])
 @csrf.exempt
 def login():
@@ -99,9 +97,8 @@ def upload_file():
 
     file_data = file.read()
     if not file_data:
-        return jsonify({"error": "File upload failed, no data read."}), 500  # ✅ Debugging
+        return jsonify({"error": "File upload failed, no data read."}), 500
 
-    # ✅ Store file in database with binary data
     new_file = UploadedFile(user_id=user.id, filename=secure_filename(file.filename), file_data=file_data)
 
     try:
@@ -111,8 +108,6 @@ def upload_file():
     except Exception as e:
         db.session.rollback()
         return jsonify({"error": f"Database error: {str(e)}"}), 500
-
-
 
 @app.route("/history", methods=["GET"])
 @jwt_required()
@@ -129,50 +124,70 @@ def get_user_history():
 
     return jsonify({"uploaded_files": files_data}), 200
 
-# ------------------ FILE PROCESSING ------------------
+# ------------------ GET USER FILES LIST ------------------
 
-@app.route("/process", methods=["POST"])
-@csrf.exempt
-def process_user_file():
-    data = request.json
-    filename = data.get("filename")
-    user_email = data.get("email")
-
-    if not filename or not user_email:
-        return jsonify({"error": "Filename and email are required"}), 400
-
-    file_entry = UploadedFile.query.filter_by(filename=filename).first()
-    if not file_entry or file_entry.file_data is None:
-        return jsonify({"error": "File not found or empty"}), 404
-
-    file_data = file_entry.file_data
-    file_type = filename.split('.')[-1]
-
-    processed_df, message = process_data(file_data, file_type)
-    if processed_df is None:
-        return jsonify({"error": message}), 500
-
-    success, file_url = save_processed_file(user_email, filename, processed_df, file_type)
-    if not success:
-        return jsonify({"error": file_url}), 500
-
-    return jsonify({"message": message, "download_url": file_url}), 200
-
-
-@app.route("/processed_files", methods=["GET"])
+@app.route('/files/<email>', methods=['GET'])
 @jwt_required()
 @csrf.exempt
-def get_processed_files():
+def get_user_files(email):
+    current_user = get_jwt_identity()
+
+    if current_user != email:
+        return jsonify({"error": "Unauthorized access"}), 403
+
+    user = User_Detail.query.filter_by(email=email).first()
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    files = UploadedFile.query.filter_by(user_id=user.id).all()
+    filenames = [file.filename for file in files]
+
+    return jsonify({"files": filenames}), 200
+
+# ------------------ DOWNLOAD FILE BY NAME ------------------
+
+@app.route('/download/<filename>', methods=['GET'])
+@jwt_required()
+@csrf.exempt
+def download_file(filename):
     current_user = get_jwt_identity()
     user = User_Detail.query.filter_by(email=current_user).first()
 
     if not user:
         return jsonify({"error": "User not found"}), 404
 
-    processed_files = ProcessedFile.query.filter_by(user_id=user.id).all()
-    files_data = [{"filename": file.filename, "processed_time": file.processed_time.strftime("%Y-%m-%d %H:%M:%S"), "download_url": file.file_url} for file in processed_files]
+    file_entry = UploadedFile.query.filter_by(user_id=user.id, filename=filename).first()
 
-    return jsonify({"processed_files": files_data}), 200
+    if not file_entry:
+        return jsonify({"error": "File not found"}), 404
+
+    return file_entry.file_data, 200, {
+        'Content-Type': 'application/octet-stream',
+        'Content-Disposition': f'attachment; filename={filename}'
+    }
+
+# ------------------ GET FILE DATA (For Visualization Page) ------------------
+
+@app.route('/get_file_data', methods=['GET'])
+@jwt_required()
+@csrf.exempt
+def get_file_data():
+    email = get_jwt_identity()
+    filename = request.args.get("filename")
+
+    user = User_Detail.query.filter_by(email=email).first()
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    file_entry = UploadedFile.query.filter_by(user_id=user.id, filename=filename).first()
+
+    if not file_entry:
+        return jsonify({"error": "File not found"}), 404
+
+    return file_entry.file_data, 200, {
+        'Content-Type': 'application/octet-stream',
+        'Content-Disposition': f'attachment; filename={filename}'
+    }
 
 # ------------------ RUN FLASK APP ------------------
 

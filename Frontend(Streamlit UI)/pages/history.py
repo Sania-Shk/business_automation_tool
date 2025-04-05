@@ -1,6 +1,11 @@
 import streamlit as st
 import requests
 
+# ⬇ Load CSS
+def load_css():
+    with open("static/style.css") as f:
+        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+
 API_URL = "http://127.0.0.1:5000"  # Change this if using a deployed backend
 
 def show_history_page():
